@@ -1,1 +1,3 @@
 *.keytab
+*.tmp
+kerberos-data/*

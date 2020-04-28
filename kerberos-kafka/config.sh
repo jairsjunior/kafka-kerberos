@@ -46,6 +46,25 @@ create_config() {
 EOF
 }
 
+create_kdc_config() {
+  cat>/var/kerberos/krb5kdc/kdc.conf<<EOF
+[kdcdefaults]
+ kdc_ports = 88
+ kdc_tcp_ports = 88
+
+[realms]
+ $REALM = {
+  #master_key_type = aes256-cts
+  database_name = /volumes/kerberos/principal
+  acl_file = /volumes/kerberos/kadm5.acl
+  dict_file = /volumes/kerberos/kadm5.dict
+  admin_keytab = /volumes/kerberos/kadm5.keytab
+  key_stash_file = /volumes/kerberos/.k5.$REALM
+  supported_enctypes = aes256-cts:normal aes128-cts:normal des3-hmac-sha1:normal arcfour-hmac:normal des-hmac-sha1:normal des-cbc-md5:normal des-cbc-crc:normal
+ }
+EOF
+}
+
 create_db() {
   /usr/sbin/kdb5_util -P $KERB_MASTER_KEY -r $REALM create -s
 }
@@ -67,7 +86,7 @@ restart_kdc() {
 
 create_admin_user() {
   kadmin.local -q "addprinc -pw $KERB_ADMIN_PASS $KERB_ADMIN_USER/admin"
-  echo "*/admin@$REALM *" > /var/kerberos/krb5kdc/kadm5.acl
+  echo "*/admin@$REALM *" > /volumes/kerberos/kadm5.acl
 }
 
 create_users() {
@@ -76,7 +95,7 @@ create_users() {
   kadmin.local -q "ktadd -k /volumes/keytabs/kafka_broker.keytab kafka/broker.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT"
 
   #Create client keytab
-  kadmin.local -q 'addprinc -pq zookeeper123456 kafka/zookeeper.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT'
+  kadmin.local -q 'addprinc -pw zookeeper123456 kafka/zookeeper.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT'
   kadmin.local -q "ktadd -k /volumes/keytabs/kafka_client1.keytab kafka/zookeeper.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT"
 }
 
@@ -84,19 +103,23 @@ main() {
   fix_nameserver
   fix_hostname
 
-  if [ ! -f /kerberos_initialized ]; then
+  if [ ! -f /volumes/kerberos/kerberos_initialized ]; then
+    create_kdc_config
     create_config
     create_db
     create_admin_user
     create_users
     start_kdc
+    cp /etc/krb5.conf /volumes/kerberos/krb5.conf
 
-    touch /kerberos_initialized
+    touch /volumes/kerberos/kerberos_initialized
   fi
 
-  if [ ! -f /var/kerberos/krb5kdc/principal ]; then
+  if [ ! -f /volumes/kerberos/principal ]; then
     while true; do sleep 1000; done
   else
+    create_kdc_config
+    create_config
     start_kdc
     tail -F /var/log/kerberos/krb5kdc.log
   fi

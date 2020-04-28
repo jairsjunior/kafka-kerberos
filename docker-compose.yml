@@ -1,4 +1,5 @@
 version: '3.6'
+
 services:
     kerberos: 
         image: local/kerberos-kafka
@@ -13,6 +14,7 @@ services:
             - KERB_ADMIN_PASS=admin
             - SEARCH_DOMAINS=search.consul kerberos.kafka-kerberos_default
         volumes: 
+            - ./kerberos-data:/volumes/kerberos
             - ./kerberos-keytabs:/volumes/keytabs
 
     zookeeper:
