@@ -1,0 +1,101 @@
+version: '3.6'
+services:
+    kerberos: 
+        image: local/kerberos-kafka
+        build: ./kerberos-kafka
+        hostname: kerberos
+        container_name: kerberos
+        environment: 
+            - REALM=KERBEROS.KAFKA-KERBEROS_DEFAULT
+            - DOMAIN_REALM=kerberos.kafka-kerberos_default
+            - KERB_MASTER_KEY=masterkey
+            - KERB_ADMIN_USER=admin
+            - KERB_ADMIN_PASS=admin
+            - SEARCH_DOMAINS=search.consul kerberos.kafka-kerberos_default
+        volumes: 
+            - ./kerberos-keytabs:/volumes/keytabs
+
+    zookeeper:
+        image: confluentinc/cp-zookeeper:5.3.1
+        hostname: zookeeper
+        container_name: zookeeper
+        ports:
+            - 2181:2181
+        environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+            ZOOKEEPER_TICK_TIME: 2000
+            KAFKA_OPTS: "-Djava.security.auth.login.config=/tmp/kafka_client_jaas.conf -Djava.security.krb5.conf=/etc/kafka/krb5.conf "
+        volumes:
+            - ./kerberos-keytabs/kafka_client1.keytab:/tmp/kafka_client1.keytab
+            - ./kafka-jaas/kafka_client_jaas.conf:/tmp/kafka_client_jaas.conf
+            - ./kafka-jaas/producer.properties:/tmp/producer.properties
+            - ./kafka-jaas/consumer.properties:/tmp/consumer.properties
+            - ./kerberos-data/krb5.conf:/etc/kafka/krb5.conf
+
+    broker:
+        image: confluentinc/cp-kafka:5.3.1
+        hostname: broker
+        container_name: broker
+        depends_on:
+            - zookeeper
+        ports:
+            - 29092:29092
+            - 9092:9092
+            - 9093:9093
+        environment:
+            #BASE CONFLUENT ENVIRONMENTS
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+            CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
+            CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+            CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+            CONFLUENT_METRICS_ENABLE: 'true'
+            CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+            #KAFKA SASL SET HANDLER
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT
+            KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,SASL_PLAINTEXT://0.0.0.0:9093
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092,SASL_PLAINTEXT://broker:9093
+            KAFKA_SASL_KERBEROS_SERVICE_NAME: kafka
+            KAFKA_SASL_ENABLED_MECHANISMS: GSSAPI
+            KAFKA_LOG_RETENTION_MS: 259200000
+            #KAKFA JAAS CONFIGURATION FILE
+            KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf -Djava.security.krb5.conf=/etc/kafka/krb5.conf "
+            ZOOKEEPER_SASL_ENABLED: "FALSE"
+            #KAFKA INTERBROKER SECURITY
+            KAFKA_SECURITY_INTER_BROKER_PROTOCOL: PLAINTEXT
+            KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+            KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,org.apache.kafka=INFO"
+            KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
+            ############## Authorizer ######################
+            KAFKA_AUTHORIZER_CLASS_NAME: "kafka.security.auth.SimpleAclAuthorizer"
+            KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+            # Access denials are logged at INFO level, change to DEBUG to also log allowed accesses
+            KAFKA_LOG4J_LOGGER_KAFKA_AUTHORIZER_LOGGER: "DEBUG, authorizerAppender"
+            KAFKA_LOG4J_ADDITIVITY_KAFKA_AUTHORIZER_LOGGER: "false"
+        volumes:
+            - ./kafka-jaas/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+            - ./kerberos-keytabs/kafka_broker.keytab:/etc/security/keytabs/kafka_broker.keytab
+            - ./kerberos-data/krb5.conf:/etc/kafka/krb5.conf
+    
+    kafka-ui:
+        image: obsidiandynamics/kafdrop
+        ports: 
+            - 9000:9000
+        environment: 
+            - KAFKA_BROKERCONNECT=broker:29092
+            - JVM_OPTS=-Xms32M -Xmx64M
+            - SERVER_SERVLET_CONTEXTPATH=/ 
+
+    schema-registry:
+        image: confluentinc/cp-schema-registry:5.3.1
+        hostname: schema-registry
+        container_name: schema-registry
+        depends_on:
+            - zookeeper
+        ports:
+            - 8081:8081
+        environment:
+            SCHEMA_REGISTRY_HOST_NAME: schema-registry
+            SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
