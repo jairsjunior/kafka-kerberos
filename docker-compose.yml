@@ -99,5 +99,53 @@ services:
         ports:
             - 8081:8081
         environment:
-            SCHEMA_REGISTRY_HOST_NAME: schema-registry
-            SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+            - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+            - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=SASL_PLAINTEXT://broker:9093
+            - SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL=SASL_PLAINTEXT
+            - SCHEMA_REGISTRY_KAFKASTORE_SASL_KERBEROS_SERVICE_NAME=kafka
+            - SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM=GSSAPI
+            - SCHEMA_REGISTRY_JMX_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=49999 -Djava.security.auth.login.config=/etc/schema-registry/kafka_schema_registry_jaas.conf -Djava.security.krb5.conf=/etc/schema-registry/krb5.conf
+            - CUB_CLASSPATH=/etc/confluent/docker/docker-utils.jar -Djava.security.auth.login.config=/etc/schema-registry/kafka_schema_registry_jaas.conf -Djava.security.krb5.conf=/etc/schema-registry/krb5.conf
+        volumes:
+            - ./kafka-jaas/kafka_schema_registry_jaas.conf:/etc/schema-registry/kafka_schema_registry_jaas.conf
+            - ./kerberos-keytabs/kafka_schema-registry.keytab:/etc/security/keytabs/kafka_schema-registry.keytab
+            - ./kerberos-data/krb5.conf:/etc/schema-registry/krb5.conf
+            
+    rest-proxy:
+        image: confluentinc/cp-kafka-rest:5.3.1
+        depends_on:
+            - zookeeper
+            - broker
+            - schema-registry
+        ports:
+            - 8082:8082
+        hostname: rest-proxy
+        container_name: rest-proxy
+        environment:
+            KAFKA_REST_HOST_NAME: rest-proxy
+            KAFKA_REST_BOOTSTRAP_SERVERS: 'SASL_PLAINTEXT://broker:9093'
+            KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+            KAFKA_REST_SASL_KERBEROS_SERVICE_NAME: kafka
+            KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+            KAFKA_REST_SECURITY_PROTOCOL: SASL_PLAINTEXT
+            KAFKA_REST_SASL_MECHANISM: GSSAPI
+            
+            KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
+            KAFKA_REST_CLIENT_SASL_MECHANISM: GSSAPI
+            KAFKA_REST_CLIENT_SASL_KERBEROS_SERVICE_NAME: kafka
+
+            KAFKAREST_OPTS: '-Djava.security.auth.login.config=/etc/rest-proxy/kafka_rest_proxy_jaas.conf -Djava.security.krb5.conf=/etc/rest-proxy/krb5.conf'
+    
+            KAFKA_REST_ACCESS_CONTROL_ALLOW_ORIGIN: '*'
+            KAFKA_REST_ACCESS_CONTROL_ALLOW_METHODS: 'GET,POST,PUT,DELETE'
+            KAFKA_REST_ACCESS_CONTROL_ALLOW_HEADERS: 'origin,content-type,accept,authorization'
+    
+            #Only need for confluentinc/kafka-rest container
+            CUB_CLASSPATH: "/etc/confluent/docker/docker-utils.jar -Djava.security.auth.login.config=/etc/rest-proxy/kafka_rest_proxy_jaas.conf -Djava.security.krb5.conf=/etc/rest-proxy/krb5.conf"
+            ################# log4j ########################
+            KAFKA_REST_LOG4J_LOGGERS: "kafka.controller=INFO,org.apache.kafka=INFO"
+            KAFKA_REST_LOG4J_ROOT_LOGLEVEL: INFO
+        volumes:
+            - ./kafka-jaas/kafka_rest_proxy_jaas.conf:/etc/rest-proxy/kafka_rest_proxy_jaas.conf
+            - ./kerberos-keytabs/kafka_rest-proxy.keytab:/etc/security/keytabs/kafka_rest-proxy.keytab
+            - ./kerberos-data/krb5.conf:/etc/rest-proxy/krb5.conf

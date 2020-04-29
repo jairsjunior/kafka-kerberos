@@ -97,6 +97,14 @@ create_users() {
   #Create client keytab
   kadmin.local -q 'addprinc -pw zookeeper123456 kafka/zookeeper.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT'
   kadmin.local -q "ktadd -k /volumes/keytabs/kafka_client1.keytab kafka/zookeeper.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT"
+
+  #Create Schema Registry keytab
+  kadmin.local -q 'addprinc -pw schemaregistry123456 kafka/schema-registry.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT'
+  kadmin.local -q "ktadd -k /volumes/keytabs/kafka_schema-registry.keytab kafka/schema-registry.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT"
+
+  #Create Rest Proxy keytab
+  kadmin.local -q 'addprinc -pw restproxy123456 kafka/rest-proxy.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT'
+  kadmin.local -q "ktadd -k /volumes/keytabs/kafka_rest-proxy.keytab kafka/rest-proxy.kafka-kerberos_default@KERBEROS.KAFKA-KERBEROS_DEFAULT"
 }
 
 main() {
