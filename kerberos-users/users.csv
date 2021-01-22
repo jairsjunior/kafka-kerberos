@@ -1,0 +1,5 @@
+kafka,broker,kafka_broker
+kafka,zookeeper,kafka_client1
+kafka,schema-registry,kafka_schema-registry,schema1234
+kafka,rest-proxy,kafka_rest-proxy,rest1234
+kafka,kafka2influx,kafka_kafka2influx,influx1234

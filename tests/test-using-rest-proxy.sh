@@ -10,7 +10,7 @@ curl -X POST -H "Content-Type: application/vnd.kafka.json.v2+json" \
       --data '{"records":[{"value":{"foo":"bar 2"}}]}' "http://localhost:8082/topics/test-topic"
 
 echo "\nWait to start Consuming"
-sleep 2
+sleep 5
 
 # Create a consumer for JSON data, starting at the beginning of the topic's
 # log and subscribe to a topic. Then consume some data using the base URL in the first response.

@@ -3,10 +3,14 @@
 docker-compose build
 docker-compose up -d kerberos
 
-while [ ! -f kerberos-keytabs/kafka_rest-proxy.keytab ]; 
+while [ ! -f kerberos-keytabs/kafka_client1.keytab ]; 
 do sleep 5;
 done
 
 sleep 5;
 
-docker-compose up -d
+docker-compose down
+
+sleep 5;
+
+docker stack deploy -c docker-compose.yml kafka-kerberos
